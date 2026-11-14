@@ -256,6 +256,11 @@ class MuseGenerationProvider implements GenerationProvider {
           duration: job.settings.videoDurationSeconds || 5,
           motionPreset: job.settings.motionPreset || 'dolly',
           referenceImageUrl: job.referenceImageUrl,
+          enableVoiceover: job.settings.enableVoiceover,
+          voiceId: job.settings.voiceId,
+          voiceScript: job.settings.voiceScript,
+          enableSubtitles: job.settings.enableSubtitles,
+          subtitleStyle: job.settings.subtitleStyle,
         }),
       });
 

@@ -65,6 +65,26 @@ export const MOTION_PRESETS: { value: MotionPreset; label: string; desc: string;
   { value: 'drone', label: 'Bay cao (Drone)', desc: 'Góc máy FPV / Flycam từ trên cao bao quát', promptSuffix: 'sweeping aerial drone shot, cinematic establishing view, smooth motion' },
 ];
 
+export const VOICE_OPTIONS = [
+  { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (Nữ miền Nam)', desc: 'Truyền cảm, chuẩn TikTok & Reels viral' },
+  { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (Nam miền Bắc)', desc: 'Thời sự, phóng sự, thuyết minh tin tức' },
+  { id: 'en-US-JennyNeural', name: 'Jenny (Nữ tiếng Anh)', desc: 'Tự nhiên, kênh quốc tế' },
+  { id: 'en-US-GuyNeural', name: 'Guy (Nam tiếng Anh)', desc: 'Mạnh mẽ, kênh tin tức quốc tế' },
+];
+
+export const SUBTITLE_STYLES = [
+  { id: 'tiktok-yellow', label: 'Vàng viền đen (TikTok Viral)', color: '#FFFF00', outline: '#000000' },
+  { id: 'modern-white', label: 'Trắng viền đen (Hiện đại)', color: '#FFFFFF', outline: '#000000' },
+  { id: 'neon-cyan', label: 'Xanh Neon (Công nghệ / Sci-Fi)', color: '#00FFFF', outline: '#000000' },
+];
+
+export const BG_MUSIC_OPTIONS = [
+  { id: 'none', label: 'Không nhạc nền (Chỉ giọng đọc)' },
+  { id: 'cinematic', label: 'Cinematic Ambient (Sâu lắng, kịch tính)' },
+  { id: 'lofi', label: 'Chill Lofi (Nhẹ nhàng, thư giãn)' },
+  { id: 'upbeat', label: 'Upbeat Tech (Hào hứng, hiện đại)' },
+];
+
 export const SUPPORT_MAGIC_MODELS = [
   { id: 'ag/gemini-4-argon', name: 'Gemini 4 Argon (Siêu cấp - 9Router)', badge: 'Khuyên dùng' },
   { id: 'oc/muse-spark-1.3-contributor-free', name: 'Muse Spark 1.3 (Meta AI)', badge: 'Nhanh' },

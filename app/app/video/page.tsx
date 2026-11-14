@@ -28,6 +28,8 @@ import {
   Volume2,
   VolumeX,
   X,
+  Mic,
+  Type,
 } from 'lucide-react';
 import { db, syncCloudToLocal } from '@/lib/db';
 import {
@@ -44,6 +46,8 @@ import {
   IMAGE_STYLES,
   MOTION_PRESETS,
   DEMO_SAMPLE_VIDEOS,
+  VOICE_OPTIONS,
+  SUBTITLE_STYLES,
 } from '@/lib/constants';
 import { mockGenerationProvider } from '@/features/generation/mock-provider';
 import { useTheme } from '@/components/shared/theme-provider';
@@ -66,6 +70,15 @@ export default function VideoStudioPage() {
   const [referenceTitle, setReferenceTitle] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Voiceover & Subtitles states (Shorts / TikTok Studio)
+  const [enableVoiceover, setEnableVoiceover] = useState(true);
+  const [voiceId, setVoiceId] = useState('vi-VN-HoaiMyNeural');
+  const [voiceScript, setVoiceScript] = useState('');
+  const [enableSubtitles, setEnableSubtitles] = useState(true);
+  const [subtitleStyle, setSubtitleStyle] = useState<'tiktok-yellow' | 'modern-white' | 'neon-cyan'>(
+    'tiktok-yellow'
+  );
 
   // Generation & AI assistant states
   const [isGenerating, setIsGenerating] = useState(false);
@@ -268,6 +281,11 @@ export default function VideoStudioPage() {
             motionPreset,
             videoDurationSeconds: duration,
             model: 'muse-web/muse-video',
+            enableVoiceover,
+            voiceId,
+            voiceScript: voiceScript.trim() || undefined,
+            enableSubtitles,
+            subtitleStyle,
           },
         },
         (event: ProgressEvent) => {
@@ -747,6 +765,120 @@ export default function VideoStudioPage() {
                 </div>
               </div>
             </details>
+
+            {/* TikTok & Shorts Audio/Subtitles Studio Card */}
+            <div className="p-4 rounded-2xl border border-[#DCE1F4] bg-[#F8F9FE] space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-[#6C47FF] to-[#FF4785] text-white flex items-center justify-center shadow-sm">
+                    <Mic className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-[#181D30]">
+                      Lồng tiếng AI & Phụ đề TikTok
+                    </h4>
+                    <p className="text-[10px] text-[#5E6582]">
+                      Tự động ghép giọng đọc truyền cảm & chữ chạy theo nhịp video
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-[#6C47FF] bg-[#EDE9FE] px-2 py-0.5 rounded-full">
+                  Shorts / Reels Pro
+                </span>
+              </div>
+
+              {/* Toggles */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white border border-[#E2E6F4] cursor-pointer hover:border-[#6C47FF]">
+                  <input
+                    type="checkbox"
+                    checked={enableVoiceover}
+                    onChange={(e) => setEnableVoiceover(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#6C47FF] accent-[#6C47FF]"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#181D30]">Giọng đọc AI</div>
+                    <div className="text-[10px] text-[#5E6582]">Thuyết minh kịch bản</div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white border border-[#E2E6F4] cursor-pointer hover:border-[#6C47FF]">
+                  <input
+                    type="checkbox"
+                    checked={enableSubtitles}
+                    onChange={(e) => setEnableSubtitles(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#6C47FF] accent-[#6C47FF]"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#181D30]">Phụ đề động</div>
+                    <div className="text-[10px] text-[#5E6582]">Chữ nhảy chuẩn TikTok</div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Voice selection & style controls if enabled */}
+              {enableVoiceover && (
+                <div className="space-y-2 pt-1">
+                  <label className="block text-[11px] font-bold text-[#181D30]">
+                    Chọn giọng thuyết minh
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {VOICE_OPTIONS.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setVoiceId(v.id)}
+                        className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                          voiceId === v.id
+                            ? 'border-[#6C47FF] bg-[#F5F2FF] text-[#6C47FF]'
+                            : 'border-[#E2E6F4] bg-white text-[#181D30]'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{v.name}</div>
+                        <div className="text-[10px] text-[#5E6582] truncate">{v.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#181D30] mb-1">
+                      Kịch bản thuyết minh riêng (Tùy chọn)
+                    </label>
+                    <input
+                      type="text"
+                      value={voiceScript}
+                      onChange={(e) => setVoiceScript(e.target.value)}
+                      placeholder="Mặc định đọc theo mô tả kịch bản ở trên..."
+                      className="w-full px-3 py-1.5 rounded-xl border border-[#DCE1F4] bg-white text-xs text-[#181D30] focus:outline-none focus:border-[#6C47FF]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {enableSubtitles && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-[11px] font-bold text-[#181D30]">
+                    Màu sắc & Phong cách phụ đề
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {SUBTITLE_STYLES.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSubtitleStyle(s.id as any)}
+                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                          subtitleStyle === s.id
+                            ? 'border-[#6C47FF] bg-[#F5F2FF] text-[#6C47FF]'
+                            : 'border-[#E2E6F4] bg-white text-[#181D30]'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{s.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* CTA Button & Cost Footer */}

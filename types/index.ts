@@ -20,6 +20,12 @@ export interface GenerationSettings {
   motionPreset?: MotionPreset;
   negativePrompt?: string;
   model?: string;
+  enableVoiceover?: boolean;
+  voiceId?: string;
+  voiceScript?: string;
+  enableSubtitles?: boolean;
+  subtitleStyle?: 'tiktok-yellow' | 'modern-white' | 'neon-cyan';
+  bgMusic?: 'none' | 'cinematic' | 'lofi' | 'upbeat';
 }
 
 export interface GenerationRequest {

@@ -6,9 +6,12 @@ import {
   generateAiImageBuffer,
   saveBufferMediaToDisk,
   saveBase64MediaToDisk,
+  saveBufferMediaToDiskAndCloud,
   renderVideoFromImageWithFfmpeg,
   generateVideoViaMuseAi,
+  getOutputsDirs,
 } from '@/lib/router-config';
+import { synthesizeVoiceover, composeVideoMaster } from '@/lib/tts-service';
 import { ASPECT_RATIOS, MOTION_PRESETS } from '@/lib/constants';
 
 export const maxDuration = 60;
@@ -22,6 +25,11 @@ export async function POST(req: NextRequest) {
       duration = 5,
       motionPreset = 'dolly',
       referenceImageUrl = '',
+      enableVoiceover = false,
+      voiceId = 'vi-VN-HoaiMyNeural',
+      voiceScript = '',
+      enableSubtitles = false,
+      subtitleStyle = 'tiktok-yellow',
     } = body;
 
     if (!prompt || !String(prompt).trim()) {
@@ -83,43 +91,99 @@ export async function POST(req: NextRequest) {
         : undefined,
     });
 
+    let rawVideoUrl = '';
+    let rawVideoDiskPath = '';
+    let videoProvider = 'Muse Video Motion Engine';
+
     if (museVideo) {
-      return NextResponse.json({
-        success: true,
-        isDemo: false,
-        provider: `${museVideo.provider} + Supabase Cloud Storage`,
-        assetUrl: museVideo.publicUrl,
-        savedFilePath: museVideo.diskPath,
+      rawVideoUrl = museVideo.publicUrl;
+      rawVideoDiskPath = museVideo.diskPath;
+      videoProvider = museVideo.provider;
+    } else {
+      // 3. Fallback: If no reference image, generate AI keyframe matching prompt
+      if (!inputImagePath) {
+        const motionConfig = MOTION_PRESETS.find((m) => m.value === motionPreset);
+        const fullPrompt = motionConfig?.promptSuffix
+          ? `${englishCore}, ${motionConfig.promptSuffix}, cinematic 8k masterpiece`
+          : `${englishCore}, cinematic 8k masterpiece`;
+
+        const { buffer: imgBuf } = await generateAiImageBuffer(fullPrompt, width, height);
+        const savedFrame = saveBufferMediaToDisk(imgBuf, 'video-keyframe', 'jpg');
+        inputImagePath = savedFrame.publicFilePath;
+      }
+
+      // 4. Render smooth H.264 MP4 video with FFmpeg & upload to Supabase Storage
+      const videoResult = await renderVideoFromImageWithFfmpeg({
+        inputImagePath,
+        width,
+        height,
+        durationSeconds: durationSec,
+        motionPreset: String(motionPreset || 'dolly'),
       });
+
+      rawVideoUrl = videoResult.publicUrl;
+      rawVideoDiskPath = videoResult.diskPath;
     }
 
-    // 3. Fallback: If no reference image, generate AI keyframe matching prompt
-    if (!inputImagePath) {
-      const motionConfig = MOTION_PRESETS.find((m) => m.value === motionPreset);
-      const fullPrompt = motionConfig?.promptSuffix
-        ? `${englishCore}, ${motionConfig.promptSuffix}, cinematic 8k masterpiece`
-        : `${englishCore}, cinematic 8k masterpiece`;
+    // 5. If Voiceover or Subtitles requested, compose master video with audio and subtitles
+    if (enableVoiceover || enableSubtitles) {
+      try {
+        const finalScript =
+          voiceScript && String(voiceScript).trim() ? String(voiceScript).trim() : String(prompt).trim();
+        let voiceBuf: Buffer | undefined;
 
-      const { buffer: imgBuf } = await generateAiImageBuffer(fullPrompt, width, height);
-      const savedFrame = saveBufferMediaToDisk(imgBuf, 'video-keyframe', 'jpg');
-      inputImagePath = savedFrame.publicFilePath;
+        if (enableVoiceover) {
+          voiceBuf = await synthesizeVoiceover(finalScript, { voiceId });
+        }
+
+        let srcVideoPath = rawVideoDiskPath;
+        if ((!srcVideoPath || !fs.existsSync(/*turbopackIgnore: true*/ srcVideoPath)) && rawVideoUrl) {
+          const res = await fetch(rawVideoUrl);
+          if (res.ok) {
+            const { tempOutputs } = getOutputsDirs();
+            srcVideoPath = path.join(tempOutputs, `src-${Date.now()}.mp4`);
+            fs.writeFileSync(srcVideoPath, Buffer.from(await res.arrayBuffer()));
+          }
+        }
+
+        if (srcVideoPath && fs.existsSync(/*turbopackIgnore: true*/ srcVideoPath)) {
+          const masterBuf = await composeVideoMaster({
+            inputVideoPath: srcVideoPath,
+            voiceBuffer: voiceBuf,
+            script: finalScript,
+            durationSeconds: durationSec,
+            width,
+            height,
+            enableSubtitles: Boolean(enableSubtitles),
+            subtitleStyle: subtitleStyle as any,
+          });
+
+          if (masterBuf && masterBuf.length > 5000) {
+            const savedMaster = await saveBufferMediaToDiskAndCloud(
+              masterBuf,
+              'muse-master',
+              'mp4'
+            );
+            return NextResponse.json({
+              success: true,
+              isDemo: false,
+              provider: `${videoProvider} + Edge Voice & Subtitles + Supabase`,
+              assetUrl: savedMaster.publicUrl,
+              savedFilePath: savedMaster.diskPath,
+            });
+          }
+        }
+      } catch (composeErr) {
+        console.warn('[Video Composition Warning]:', composeErr);
+      }
     }
-
-    // 4. Render smooth H.264 MP4 video with FFmpeg & upload to Supabase Storage
-    const videoResult = await renderVideoFromImageWithFfmpeg({
-      inputImagePath,
-      width,
-      height,
-      durationSeconds: durationSec,
-      motionPreset: String(motionPreset || 'dolly'),
-    });
 
     return NextResponse.json({
       success: true,
       isDemo: false,
-      provider: 'Muse Video Motion Engine + Supabase Cloud Storage',
-      assetUrl: videoResult.publicUrl,
-      savedFilePath: videoResult.diskPath,
+      provider: `${videoProvider} + Supabase Cloud Storage`,
+      assetUrl: rawVideoUrl,
+      savedFilePath: rawVideoDiskPath,
     });
   } catch (err: any) {
     return NextResponse.json(
