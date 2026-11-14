@@ -39,13 +39,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Generate AI image buffer & save to Supabase Storage + disk
-    const imgBuf = await generateAiImageBuffer(fullPrompt, width, height);
+    const { buffer: imgBuf, provider: imageProvider } = await generateAiImageBuffer(
+      fullPrompt,
+      width,
+      height
+    );
     const saved = await saveBufferMediaToDiskAndCloud(imgBuf, 'muse-image', 'jpg');
 
     return NextResponse.json({
       success: true,
       isDemo: false,
-      provider: 'Muse AI + Supabase Cloud Storage',
+      provider: `${imageProvider} + Supabase Cloud Storage`,
       assetUrl: saved.publicUrl,
       savedFilePath: saved.diskPath,
       translatedPrompt: fullPrompt,

@@ -6,13 +6,17 @@ import ffmpegStatic from 'ffmpeg-static';
 import { uploadMediaBufferToSupabase } from '@/lib/supabase';
 import { DEMO_SAMPLE_IMAGES, DEMO_SAMPLE_VIDEOS } from '@/lib/constants';
 
-export const ROUTER_BASE_URL = process.env.NINEROUTER_URL || 'http://localhost:20128';
-export const ROUTER_API_KEY =
-  process.env.NINEROUTER_API_KEY || 'sk-770983454ad0e01b-y3q7g9-6b8a2098';
-
 export const IS_CLOUD_RUNTIME = Boolean(
   process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME
 );
+
+export const ROUTER_BASE_URL =
+  process.env.NINEROUTER_URL ||
+  (IS_CLOUD_RUNTIME
+    ? 'https://take-temporary-cable-gradually.trycloudflare.com'
+    : 'http://localhost:20128');
+export const ROUTER_API_KEY =
+  process.env.NINEROUTER_API_KEY || 'sk-770983454ad0e01b-y3q7g9-6b8a2098';
 
 export function getOutputsDirs() {
   const tempOutputs = path.join(os.tmpdir(), 'magictool-outputs');
@@ -237,12 +241,47 @@ export async function translatePromptVia9Router(rawPrompt: string): Promise<stri
 
 /**
  * Generates an AI image Buffer matching the prompt and dimensions.
+ * Priority: Real Muse AI (via 9Router muse-web/muse-image) -> Pollinations Flux -> High-res fallback.
  */
 export async function generateAiImageBuffer(
   englishPrompt: string,
   width: number,
   height: number
-): Promise<Buffer> {
+): Promise<{ buffer: Buffer; provider: string }> {
+  // 1. Try real Muse AI via 9Router (local or public tunnel)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 35000);
+    const res = await fetch(`${ROUTER_BASE_URL}/v1/images/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ROUTER_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'muse-web/muse-image',
+        prompt: englishPrompt,
+        size: `${width}x${height}`,
+        n: 1,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data?.data?.[0]?.b64_json;
+      if (b64 && typeof b64 === 'string') {
+        const buf = Buffer.from(b64, 'base64');
+        if (buf.length > 2048) {
+          return { buffer: buf, provider: 'Muse AI (muse-web/muse-image)' };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Muse Image Generation] 9Router fallback triggered:', err);
+  }
+
+  // 2. High-speed Flux fallback
   const seed = Math.floor(Math.random() * 900000) + 10000;
   const encoded = encodeURIComponent(englishPrompt.slice(0, 350));
   const urls = [
@@ -268,7 +307,7 @@ export async function generateAiImageBuffer(
         const arr = await res.arrayBuffer();
         const buf = Buffer.from(arr);
         if (buf.length > 2048) {
-          return buf;
+          return { buffer: buf, provider: 'Flux AI (Pollinations)' };
         }
       }
     } catch {
@@ -283,7 +322,9 @@ export async function generateAiImageBuffer(
     if (fallbackRes.ok) {
       const arr = await fallbackRes.arrayBuffer();
       const buf = Buffer.from(arr);
-      if (buf.length > 2048) return buf;
+      if (buf.length > 2048) {
+        return { buffer: buf, provider: 'High-Res Studio Visual Engine' };
+      }
     }
   } catch {}
 
@@ -304,7 +345,7 @@ export async function generateAiImageBuffer(
   try {
     fs.unlinkSync(tempFile);
   } catch {}
-  return buf;
+  return { buffer: buf, provider: 'Studio Canvas Fallback' };
 }
 
 /**
@@ -408,3 +449,75 @@ export async function renderVideoFromImageWithFfmpeg(params: {
     };
   }
 }
+
+/**
+ * Tries generating video directly through 9Router's muse-web/muse-video endpoint.
+ * Returns null if not available/error so caller can use FFmpeg motion rendering fallback.
+ */
+export async function generateVideoViaMuseAi(params: {
+  prompt: string;
+  width: number;
+  height: number;
+  durationSeconds: number;
+  referenceImageBase64?: string;
+}): Promise<{ publicUrl: string; diskPath: string; provider: string } | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 65000);
+    const bodyPayload: any = {
+      model: 'muse-web/muse-video',
+      prompt: params.prompt,
+      size: `${params.width}x${params.height}`,
+      seconds: params.durationSeconds,
+    };
+    if (params.referenceImageBase64) {
+      bodyPayload.image = params.referenceImageBase64;
+    }
+
+    const res = await fetch(`${ROUTER_BASE_URL}/v1/videos/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ROUTER_API_KEY}`,
+      },
+      body: JSON.stringify(bodyPayload),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      let videoBuffer: Buffer | null = null;
+
+      const videoUrlOrData = data?.video?.url || data?.data?.[0]?.url;
+      const b64Data = data?.data?.[0]?.b64_json || data?.video?.b64_json;
+
+      if (b64Data && typeof b64Data === 'string') {
+        videoBuffer = Buffer.from(b64Data, 'base64');
+      } else if (typeof videoUrlOrData === 'string') {
+        if (videoUrlOrData.startsWith('data:video/')) {
+          const b64 = videoUrlOrData.split(',')[1];
+          if (b64) videoBuffer = Buffer.from(b64, 'base64');
+        } else if (videoUrlOrData.startsWith('http://') || videoUrlOrData.startsWith('https://')) {
+          const vRes = await fetch(videoUrlOrData);
+          if (vRes.ok) {
+            videoBuffer = Buffer.from(await vRes.arrayBuffer());
+          }
+        }
+      }
+
+      if (videoBuffer && videoBuffer.length > 5000) {
+        const saved = await saveBufferMediaToDiskAndCloud(videoBuffer, 'muse-video', 'mp4');
+        return {
+          publicUrl: saved.publicUrl,
+          diskPath: saved.diskPath,
+          provider: 'Muse Video AI (muse-web/muse-video)',
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[Muse Video AI] Falling back to FFmpeg motion renderer:', err);
+  }
+  return null;
+}
+

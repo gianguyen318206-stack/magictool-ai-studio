@@ -7,6 +7,7 @@ import {
   saveBufferMediaToDisk,
   saveBase64MediaToDisk,
   renderVideoFromImageWithFfmpeg,
+  generateVideoViaMuseAi,
 } from '@/lib/router-config';
 import { ASPECT_RATIOS, MOTION_PRESETS } from '@/lib/constants';
 
@@ -69,20 +70,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. If no reference image (Text-to-Video mode), generate AI keyframe matching the prompt
+    const englishCore = await translatePromptVia9Router(String(prompt).trim());
+
+    // 2. Try native Muse Video AI via 9Router (local or public tunnel)
+    const museVideo = await generateVideoViaMuseAi({
+      prompt: englishCore,
+      width,
+      height,
+      durationSeconds: durationSec,
+      referenceImageBase64: referenceImageUrl.startsWith('data:image/')
+        ? referenceImageUrl
+        : undefined,
+    });
+
+    if (museVideo) {
+      return NextResponse.json({
+        success: true,
+        isDemo: false,
+        provider: `${museVideo.provider} + Supabase Cloud Storage`,
+        assetUrl: museVideo.publicUrl,
+        savedFilePath: museVideo.diskPath,
+      });
+    }
+
+    // 3. Fallback: If no reference image, generate AI keyframe matching prompt
     if (!inputImagePath) {
-      const englishCore = await translatePromptVia9Router(String(prompt).trim());
       const motionConfig = MOTION_PRESETS.find((m) => m.value === motionPreset);
       const fullPrompt = motionConfig?.promptSuffix
         ? `${englishCore}, ${motionConfig.promptSuffix}, cinematic 8k masterpiece`
         : `${englishCore}, cinematic 8k masterpiece`;
 
-      const imgBuf = await generateAiImageBuffer(fullPrompt, width, height);
+      const { buffer: imgBuf } = await generateAiImageBuffer(fullPrompt, width, height);
       const savedFrame = saveBufferMediaToDisk(imgBuf, 'video-keyframe', 'jpg');
       inputImagePath = savedFrame.publicFilePath;
     }
 
-    // 3. Render smooth H.264 MP4 video with FFmpeg & upload to Supabase Storage
+    // 4. Render smooth H.264 MP4 video with FFmpeg & upload to Supabase Storage
     const videoResult = await renderVideoFromImageWithFfmpeg({
       inputImagePath,
       width,
@@ -94,7 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       isDemo: false,
-      provider: 'Muse Video AI + Supabase Cloud Storage',
+      provider: 'Muse Video Motion Engine + Supabase Cloud Storage',
       assetUrl: videoResult.publicUrl,
       savedFilePath: videoResult.diskPath,
     });
