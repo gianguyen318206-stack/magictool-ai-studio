@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root, html.light {
+  --bg-main: #F3F5FB;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #ECEFFA;
+  --border-color: #E2E6F4;
+  --text-main: #181D30;
+  --text-muted: #5D6883;
+  --primary: #6D35D5;
+  --primary-hover: #5B21B6;
+  --secondary: #4F46E5;
+  --success: #147B64;
+  --error: #C42F4B;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html.dark {
+  --bg-main: #0B0D17;
+  --bg-surface: #141827;
+  --bg-elevated: #1C2135;
+  --border-color: #2B3148;
+  --text-main: #F5F6FF;
+  --text-muted: #A5ACC4;
+  --primary: #8B5CF6;
+  --primary-hover: #7C3AED;
+  --secondary: #5DCCF5;
+  --success: #34C7A3;
+  --error: #FF7A90;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+}
+
+/* Native accessible details/summary accordion per modern-web-guidance */
+details.studio-accordion > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+details.studio-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.studio-accordion::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+details.studio-accordion:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details.studio-accordion::details-content {
+    transition: block-size, content-visibility, display;
+    transition-duration: 0.25s;
+    transition-timing-function: ease-in-out;
+    transition-behavior: allow-discrete;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD2E6;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A0B8;
+}
+
+.reduce-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
 }
