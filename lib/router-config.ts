@@ -290,7 +290,7 @@ export async function generateAiImageBuffer(
   const ffmpeg = getFfmpegBinary();
   const { tempOutputs } = getOutputsDirs();
   const tempFile = path.join(tempOutputs, `fallback-${Date.now()}.jpg`);
-  execFileSync(ffmpeg, [
+  execFileSync(/*turbopackIgnore: true*/ ffmpeg, [
     '-y',
     '-f',
     'lavfi',
@@ -351,7 +351,7 @@ export async function renderVideoFromImageWithFfmpeg(params: {
     const pubFile = path.join(publicOutputs, filename);
     const workFile = path.join(workspaceOutputs, filename);
 
-    execFileSync(ffmpeg, [
+    execFileSync(/*turbopackIgnore: true*/ ffmpeg, [
       '-y',
       '-loop',
       '1',

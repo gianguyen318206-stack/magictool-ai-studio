@@ -44,3 +44,5 @@ next-env.d.ts
 /public/outputs/*
 !/public/outputs/.gitkeep
 
+
+.vercel
