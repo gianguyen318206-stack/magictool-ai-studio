@@ -13,7 +13,7 @@ export const IS_CLOUD_RUNTIME = Boolean(
 export const ROUTER_BASE_URL =
   process.env.NINEROUTER_URL ||
   (IS_CLOUD_RUNTIME
-    ? 'https://take-temporary-cable-gradually.trycloudflare.com'
+    ? 'https://r22zjgz.abc-tunnel.us'
     : 'http://localhost:20128');
 export const ROUTER_API_KEY =
   process.env.NINEROUTER_API_KEY || 'sk-770983454ad0e01b-y3q7g9-6b8a2098';
